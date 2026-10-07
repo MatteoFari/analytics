@@ -34,6 +34,11 @@ class RrCorrectionResult {
   /// spliced out; pass the timestamps.
   final List<double> nnTimesMs;
 
+  /// Original input index for each retained NN interval. This preserves the
+  /// reported sensor clock for methods that require it instead of the
+  /// reconstructed cumulative clock in [nnTimesMs].
+  final List<int> nnSourceIndices;
+
   /// Per-input-beat classification (same length as the input rr).
   final List<BeatClass> classes;
 
@@ -49,6 +54,7 @@ class RrCorrectionResult {
   const RrCorrectionResult({
     required this.nn,
     required this.nnTimesMs,
+    this.nnSourceIndices = const [],
     required this.classes,
     required this.cleanFraction,
     required this.droppedCount,
@@ -101,19 +107,22 @@ RrCorrectionResult correctRr(
     // beats only, classify the rest as long/short. No fabrication.
     final classes = [
       for (final rr in rrMs)
-        (rr >= 300 && rr <= 2000) ? BeatClass.normal : BeatClass.longShort
+        (rr >= 300 && rr <= 2000) ? BeatClass.normal : BeatClass.longShort,
     ];
     final nn = <double>[];
     final times = <double>[];
+    final indices = <int>[];
     for (var i = 0; i < n; i++) {
       if (classes[i] == BeatClass.normal) {
         nn.add(rrMs[i]);
         times.add(tAll[i]);
+        indices.add(i);
       }
     }
     return RrCorrectionResult(
       nn: nn,
       nnTimesMs: times,
+      nnSourceIndices: indices,
       classes: classes,
       cleanFraction: nn.length / n,
       droppedCount: n - nn.length,
@@ -169,13 +178,15 @@ RrCorrectionResult correctRr(
   // single isolated artifact rather than a spurious 2-beat run.
   for (var k = 1; k < n; k++) {
     if (classes[k] != BeatClass.ectopic) continue;
-    final prevBad = classes[k - 1] == BeatClass.extra ||
+    final prevBad =
+        classes[k - 1] == BeatClass.extra ||
         classes[k - 1] == BeatClass.missed ||
         classes[k - 1] == BeatClass.ectopic ||
         classes[k - 1] == BeatClass.longShort;
     if (!prevBad) continue;
     final oppositeSign = dRR[k] * dRR[k - 1] < 0;
-    final valueNormal = med[k] > 0 &&
+    final valueNormal =
+        med[k] > 0 &&
         rrMs[k] >= 300 &&
         rrMs[k] <= 2000 &&
         (rrMs[k] - med[k]).abs() <= 0.2 * med[k];
@@ -189,6 +200,7 @@ RrCorrectionResult correctRr(
   final isArtifact = [for (final c in classes) c != BeatClass.normal];
   final nn = <double>[];
   final times = <double>[];
+  final indices = <int>[];
   var dropped = 0;
   var corrected = 0;
   var i = 0;
@@ -196,6 +208,7 @@ RrCorrectionResult correctRr(
     if (!isArtifact[i]) {
       nn.add(rrMs[i]);
       times.add(tAll[i]);
+      indices.add(i);
       i++;
       continue;
     }
@@ -216,6 +229,7 @@ RrCorrectionResult correctRr(
         // — 1.6 % of a night at one missed beat in sixty.
         nn.add(corr);
         times.add(tAll[i]);
+        indices.add(i);
         corrected++;
       } else {
         dropped++; // no anchors -> honest drop; the clock already elapsed
@@ -237,6 +251,7 @@ RrCorrectionResult correctRr(
   return RrCorrectionResult(
     nn: nn,
     nnTimesMs: times,
+    nnSourceIndices: indices,
     classes: classes,
     cleanFraction: normalCount / n,
     droppedCount: dropped,
@@ -261,7 +276,10 @@ RrCorrectionResult correctRr(
 /// normal beat, or ordinary quantisation would re-anchor constantly; 1,000 ms
 /// is the audit's figure and is ~1 whole quantisation step.
 List<double> _beatTimes(
-    List<double> rrMs, List<double>? rrTsMs, double reanchorGapMs) {
+  List<double> rrMs,
+  List<double>? rrTsMs,
+  double reanchorGapMs,
+) {
   final n = rrMs.length;
   final t = List<double>.filled(n, 0);
   if (n == 0) return t;
@@ -302,7 +320,11 @@ List<double> _beatTimes(
 /// order of magnitude; the threshold then sinks to [floor] and the detector
 /// degenerates into a fixed 100 ms cut-off that flags ordinary RSA as ectopy.
 List<double> _slidingThreshold(
-    List<double> x, int win, double alpha, double floor) {
+  List<double> x,
+  int win,
+  double alpha,
+  double floor,
+) {
   final n = x.length;
   final out = List<double>.filled(n, 0);
   final half = win ~/ 2;
@@ -362,7 +384,8 @@ double? _splineCorrect(List<double> rr, List<bool> isArtifact, int idx) {
   const t = 0.5;
   final t2 = t * t;
   final t3 = t2 * t;
-  final v = 0.5 *
+  final v =
+      0.5 *
       ((2 * p1) +
           (-p0 + p2) * t +
           (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 +
