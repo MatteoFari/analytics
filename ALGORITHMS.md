@@ -129,6 +129,7 @@ Grouped by family (subdirectory under `lib/src/onehz/`). File paths are relative
 | `roughNight` | `human/event_detection.dart` | neutral fallback descriptor when the signature is ambiguous | — |
 | `percentileOfYou` / `personalRecord` | `human/percentile_of_you.dart` | percentile-vs-your-own-history, miss-tolerant personal-record streaks | — |
 | `glassBoxReadiness` | `human/readiness_glassbox.dart` | **deprecated** — kept only for its percentile-of-you breakdown + narrative and edge back-compat; `readinessComposite` is canonical | — |
+| `experimentalSleepReference` / `observedSleepPlan` | `human/sleep_planning.dart` | ESTIMATE (confidence ≤0.2): frozen upper-quartile sleep reference; seven calendar days of shortfall, scaled/capped next-sleep adjustment. Reference is not biological need; eligibility and policy coefficients are engineering assumptions. No alarm/weekend inference or vendor-score fitting. | Kitamura 2016 doi:10.1038/srep35812; Banks 2010 doi:10.1093/sleep/33.8.1013 (limitations, not coefficients) |
 | `sleepNeed` / `strainTarget` / `recommendedBedtime` / `recommendedWake` / `sleepPerformance` | `human/coaching.dart` | deterministic coaching layer over the metrics above (naps come from `sleep/nap.dart`, not here) | — |
 | `journalCorrelations` | `human/coaching.dart` | per-tag mean-difference correlation vs. logged outcomes, on-device, personal | — |
 

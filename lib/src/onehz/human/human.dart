@@ -25,3 +25,5 @@ export 'overreaching_conjunction.dart';
 // canonical readiness is wellness/readiness_composite.dart. Kept exported only
 // for back-compat — do NOT surface as the headline.
 export 'readiness_glassbox.dart';
+
+export 'sleep_planning.dart';
